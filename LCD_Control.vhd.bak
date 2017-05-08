@@ -1,0 +1,44 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity LCD_Control is
+	port( CLK    : in std_logic;
+			--RST_N  : in  std_logic; -- Reset
+         -- LCD Module
+			LCD_E  : out std_logic;
+			LCD_RS : out std_logic;
+			LCD_RW : out std_logic;
+			LCD_DB : out std_logic_vector(7 downto 4);
+			-- Control Module			
+			slide	    : in std_logic_vector(7 downto 0);
+			Button	 : in std_logic);
+end LCD_Control;
+
+architecture behavior of LCD_SPI is
+	component Control_test is
+	port (
+			CLK : in std_logic;
+			BT : in std_logic;
+			WDATA : out std_logic_vector(3 downto 0);
+			DATA_IN : in std_logic_vector(7 downto 0));
+	end component;
+	
+	component lcd16x2_ctrl_demo is
+		port (
+			clk    : in  std_logic;
+			mode_select : out std_logic_vector(3 downto 0);
+			lcd_e  : out std_logic;
+			lcd_rs : out std_logic;
+			lcd_rw : out std_logic;
+			lcd_db : out std_logic_vector(7 downto 4));
+	end component;
+	
+	signal mode_data : std_logic_vector(3 downto 0);
+	
+	begin
+		U0:Control_test
+			port map(CLK, Button, mode_data, slide);
+		U1:lcd16x2_ctrl_demo
+			port map(CLK, mode_data, LCD_E, LCD_RS, LCD_RW, LCD_DB);
+end behavior;

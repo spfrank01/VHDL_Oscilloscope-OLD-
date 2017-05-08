@@ -1,0 +1,107 @@
+library ieee;
+	use ieee.std_logic_1164.all;
+	use ieee.std_logic_arith.all;
+	use ieee.std_logic_unsigned.all;
+entity Control is
+	port (
+			CLK : in std_logic;
+			req_i : in std_logic;
+	      rst_i  : in	 std_logic;		-- synchronous reset, active low
+			CS, RW: out std_logic;
+			ADR : out std_logic_vector(7 downto 0);
+			DATA_IN : in std_logic_vector(7 downto 0);
+			DATA_OUT : out std_logic_vector(23 downto 0);
+			ack_for_tx: out std_logic;
+	      state_count_for_tx: out std_logic_vector(7 downto 0));
+end Control;
+
+architecture behave of Control is
+	signal Adr_tem : std_logic_vector(7 downto 0);
+	type state_type is (
+		check_start_bit,
+		check_command_bit,
+		check_address,
+		save_bit_green,
+		save_bit_red,
+		save_bit_blue);
+	signal state : state_type := check_start_bit;
+	begin
+		process(CLK, req_i, rst_i)
+			begin
+         if rst_i = '0' then
+				state <= check_start_bit;
+				CS <= '0';
+			elsif rising_edge(CLK)then
+				case state is
+					when check_start_bit =>
+					--
+					ack_for_tx <= '1';
+					state_count_for_tx <= "00000001";
+					--
+					cs <= '0';
+						if req_i = '0' and Data_IN = x"23" then
+							state <= check_address;
+						end if;
+					
+					when check_command_bit =>
+					--
+					ack_for_tx <= '1';
+					state_count_for_tx <= "00000011";
+					--
+						if req_i = '0' then
+							 if DATA_IN = x"24" then
+								 RW <= '0';
+								 ADR <= Adr_tem;
+							    CS <= '1';
+								 state <= check_start_bit;
+							 elsif DATA_IN = x"25" then
+							    state <= save_bit_green;
+							 end if;
+						end if;
+						
+				  when check_address =>
+					--
+					ack_for_tx <= '1';
+					state_count_for_tx <= "00000010";
+					--
+						if req_i = '0' then
+							Adr_tem <= DATA_IN;
+							state <= check_command_bit;
+						end if;
+					
+					when save_bit_green =>
+					--
+					ack_for_tx <= '1';
+					state_count_for_tx <= "00000100";
+					--
+						if req_i = '0' then
+							DATA_OUT(23 downto 16) <= DATA_IN; -- "XXXX XXXX 0000 0000 0000 0000"
+							state <= save_bit_red;
+						end if;	
+						
+					when save_bit_red =>
+					--
+					ack_for_tx <= '1';
+					state_count_for_tx <= "00000101";
+					--
+						if req_i = '0' then
+							DATA_OUT(15 downto 8) <= DATA_IN; -- "0000 0000 XXXX XXXX 0000 0000"
+							state <= save_bit_blue;
+						end if;	
+							
+					when save_bit_blue =>
+					--
+					ack_for_tx <= '1';
+					state_count_for_tx <= "00000110";
+					--
+						if req_i = '0' then
+							DATA_OUT(7 downto 0) <= DATA_IN; -- "0000 0000 0000 0000 XXXX XXXX"
+							RW <= '1';
+							ADR <= Adr_tem;
+							CS <= '1';
+							state <= check_start_bit;
+						end if;	
+				end case;
+			end if;
+		end process;
+end behave;
